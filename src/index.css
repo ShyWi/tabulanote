@@ -1,0 +1,161 @@
+:root {
+  color-scheme: light;
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+.board {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background: #eef0f2;
+  background-image: radial-gradient(#d7dbe0 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.board__add {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 10;
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 8px;
+  background: #2d5c3a;
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.board__add:hover {
+  background: #244a2f;
+}
+
+.board__canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transform-origin: 0 0;
+}
+
+.board__zoom {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.6rem;
+  background: #fff;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.board__zoom button {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: #eef0f2;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #222;
+}
+
+.board__zoom button:hover {
+  background: #dfe3e6;
+}
+
+.board__zoom span {
+  min-width: 3ch;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #444;
+}
+
+.board__zoom-reset {
+  width: auto !important;
+  border-radius: 999px !important;
+  padding: 0 0.6rem;
+  font-size: 0.8rem !important;
+}
+
+.postit {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  border-radius: 4px;
+  box-shadow: 3px 4px 10px rgba(0, 0, 0, 0.25);
+}
+
+.postit__handle {
+  height: 22px;
+  cursor: grab;
+  display: flex;
+  justify-content: flex-end;
+  touch-action: none;
+}
+
+.postit__handle:active {
+  cursor: grabbing;
+}
+
+.postit__close {
+  border: none;
+  background: transparent;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 2px 8px;
+  cursor: pointer;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.postit__close:hover {
+  color: rgba(0, 0, 0, 0.8);
+}
+
+.postit__text {
+  flex: 1;
+  resize: none;
+  border: none;
+  background: transparent;
+  padding: 0 12px 12px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: #222;
+}
+
+.postit__text:focus {
+  outline: none;
+}
+
+.postit__resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 2px;
+  cursor: nwse-resize;
+  touch-action: none;
+}
