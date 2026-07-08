@@ -33,6 +33,7 @@ export function PostIt({ note, zoom, onMove, onResize, onTextChange, onRemove }:
   const resizeRef = useRef<ResizeState | null>(null)
 
   function handlePointerDown(e: PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0) return
     e.currentTarget.setPointerCapture(e.pointerId)
     dragRef.current = {
       pointerId: e.pointerId,
@@ -59,6 +60,7 @@ export function PostIt({ note, zoom, onMove, onResize, onTextChange, onRemove }:
   }
 
   function handleResizePointerDown(e: PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0) return
     e.stopPropagation()
     e.currentTarget.setPointerCapture(e.pointerId)
     resizeRef.current = {

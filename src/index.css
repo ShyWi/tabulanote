@@ -22,6 +22,12 @@ body,
   background: #eef0f2;
   background-image: radial-gradient(#d7dbe0 1px, transparent 1px);
   background-size: 24px 24px;
+  touch-action: none;
+}
+
+.board.is-panning {
+  cursor: grabbing;
+  user-select: none;
 }
 
 .board__add {

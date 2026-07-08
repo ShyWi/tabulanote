@@ -1,4 +1,4 @@
-import { useEffect, useState, type WheelEvent } from 'react'
+import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import type { Note } from '../types'
 import { loadNotes, saveNotes } from '../storage'
 import { PostIt } from './PostIt'
@@ -25,9 +25,21 @@ function createNote(): Note {
   }
 }
 
+interface PanState {
+  pointerId: number
+  startX: number
+  startY: number
+  panX: number
+  panY: number
+}
+
 export function Board() {
   const [notes, setNotes] = useState<Note[]>(loadNotes)
   const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [isPanning, setIsPanning] = useState(false)
+  const boardRef = useRef<HTMLDivElement>(null)
+  const panRef = useRef<PanState | null>(null)
 
   useEffect(() => {
     saveNotes(notes)
@@ -48,10 +60,42 @@ export function Board() {
     return () => window.removeEventListener('keydown', blockBrowserZoomKeys)
   }, [])
 
-  function handleWheel(e: WheelEvent<HTMLDivElement>) {
-    if (!e.ctrlKey) return
+  useEffect(() => {
+    const board = boardRef.current
+    if (!board) return
+
+    // React's onWheel is registered as a passive listener, so preventDefault()
+    // there can't stop the browser's native pinch/ctrl+wheel zoom. A native,
+    // non-passive listener is required to actually intercept it.
+    function handleWheel(e: globalThis.WheelEvent) {
+      if (!e.ctrlKey) return
+      e.preventDefault()
+      setZoom((z) => clampZoom(z - e.deltaY * 0.01))
+    }
+
+    board.addEventListener('wheel', handleWheel, { passive: false })
+    return () => board.removeEventListener('wheel', handleWheel)
+  }, [])
+
+  function handleBoardPointerDown(e: PointerEvent<HTMLDivElement>) {
+    if (e.button !== 1) return
     e.preventDefault()
-    setZoom((z) => clampZoom(z - e.deltaY * 0.01))
+    e.currentTarget.setPointerCapture(e.pointerId)
+    panRef.current = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y }
+    setIsPanning(true)
+  }
+
+  function handleBoardPointerMove(e: PointerEvent<HTMLDivElement>) {
+    const drag = panRef.current
+    if (!drag || drag.pointerId !== e.pointerId) return
+    setPan({ x: drag.panX + (e.clientX - drag.startX), y: drag.panY + (e.clientY - drag.startY) })
+  }
+
+  function handleBoardPointerUp(e: PointerEvent<HTMLDivElement>) {
+    if (!panRef.current || panRef.current.pointerId !== e.pointerId) return
+    panRef.current = null
+    setIsPanning(false)
+    e.currentTarget.releasePointerCapture(e.pointerId)
   }
 
   function addNote() {
@@ -75,7 +119,13 @@ export function Board() {
   }
 
   return (
-    <div className="board" onWheel={handleWheel}>
+    <div
+      className={`board ${isPanning ? 'is-panning' : ''}`}
+      ref={boardRef}
+      onPointerDown={handleBoardPointerDown}
+      onPointerMove={handleBoardPointerMove}
+      onPointerUp={handleBoardPointerUp}
+    >
       <button type="button" className="board__add" onClick={addNote}>
         + Nueva nota
       </button>
@@ -93,7 +143,10 @@ export function Board() {
         </button>
       </div>
 
-      <div className="board__canvas" style={{ transform: `scale(${zoom})` }}>
+      <div
+        className="board__canvas"
+        style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
+      >
         {notes.map((note) => (
           <PostIt
             key={note.id}
