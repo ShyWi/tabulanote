@@ -1,9 +1,10 @@
 import type { Note } from './types'
 
-const STORAGE_KEY = 'anotador.notes'
+const NOTES_KEY = 'anotador.notes'
+const VIEWPORT_KEY = 'anotador.viewport'
 
 export function loadNotes(): Note[] {
-  const raw = localStorage.getItem(STORAGE_KEY)
+  const raw = localStorage.getItem(NOTES_KEY)
   if (!raw) return []
 
   try {
@@ -20,5 +21,35 @@ export function loadNotes(): Note[] {
 }
 
 export function saveNotes(notes: Note[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(notes))
+  localStorage.setItem(NOTES_KEY, JSON.stringify(notes))
+}
+
+export interface Viewport {
+  pan: { x: number; y: number }
+  zoom: number
+}
+
+const DEFAULT_VIEWPORT: Viewport = { pan: { x: 0, y: 0 }, zoom: 1 }
+
+export function loadViewport(): Viewport {
+  const raw = localStorage.getItem(VIEWPORT_KEY)
+  if (!raw) return DEFAULT_VIEWPORT
+
+  try {
+    const parsed = JSON.parse(raw)
+    if (
+      typeof parsed?.zoom !== 'number' ||
+      typeof parsed?.pan?.x !== 'number' ||
+      typeof parsed?.pan?.y !== 'number'
+    ) {
+      return DEFAULT_VIEWPORT
+    }
+    return parsed
+  } catch {
+    return DEFAULT_VIEWPORT
+  }
+}
+
+export function saveViewport(viewport: Viewport) {
+  localStorage.setItem(VIEWPORT_KEY, JSON.stringify(viewport))
 }

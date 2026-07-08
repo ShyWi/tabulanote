@@ -6,6 +6,7 @@ interface Props {
   zoom: number
   onMove: (id: string, x: number, y: number) => void
   onResize: (id: string, width: number, height: number) => void
+  onDragEnd: () => void
   onTextChange: (id: string, text: string) => void
   onRemove: (id: string) => void
 }
@@ -28,7 +29,7 @@ interface ResizeState {
 
 const MIN_SIZE = 120
 
-export function PostIt({ note, zoom, onMove, onResize, onTextChange, onRemove }: Props) {
+export function PostIt({ note, zoom, onMove, onResize, onDragEnd, onTextChange, onRemove }: Props) {
   const dragRef = useRef<DragState | null>(null)
   const resizeRef = useRef<ResizeState | null>(null)
 
@@ -55,8 +56,10 @@ export function PostIt({ note, zoom, onMove, onResize, onTextChange, onRemove }:
   }
 
   function handlePointerUp(e: PointerEvent<HTMLDivElement>) {
+    if (!dragRef.current) return
     dragRef.current = null
     e.currentTarget.releasePointerCapture(e.pointerId)
+    onDragEnd()
   }
 
   function handleResizePointerDown(e: PointerEvent<HTMLDivElement>) {
@@ -81,8 +84,10 @@ export function PostIt({ note, zoom, onMove, onResize, onTextChange, onRemove }:
   }
 
   function handleResizePointerUp(e: PointerEvent<HTMLDivElement>) {
+    if (!resizeRef.current) return
     resizeRef.current = null
     e.currentTarget.releasePointerCapture(e.pointerId)
+    onDragEnd()
   }
 
   return (

@@ -165,3 +165,44 @@ body,
   cursor: nwse-resize;
   touch-action: none;
 }
+
+.scrollbar {
+  position: absolute;
+  z-index: 9;
+  background: rgba(0, 0, 0, 0.05);
+  touch-action: none;
+}
+
+.scrollbar--horizontal {
+  left: 0;
+  right: 14px;
+  bottom: 0;
+  height: 14px;
+}
+
+.scrollbar--vertical {
+  top: 0;
+  bottom: 14px;
+  right: 0;
+  width: 14px;
+}
+
+.scrollbar__thumb {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 7px;
+}
+
+.scrollbar--horizontal .scrollbar__thumb {
+  top: 2px;
+  bottom: 2px;
+}
+
+.scrollbar--vertical .scrollbar__thumb {
+  left: 2px;
+  right: 2px;
+}
+
+.scrollbar__thumb:hover {
+  background: rgba(0, 0, 0, 0.4);
+}
