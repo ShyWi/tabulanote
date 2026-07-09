@@ -29,10 +29,12 @@ interface ResizeState {
 
 const MIN_SIZE = 120
 
+/** A single draggable, resizable, editable sticky note. */
 export function PostIt({ note, zoom, onMove, onResize, onDragEnd, onTextChange, onRemove }: Props) {
   const dragRef = useRef<DragState | null>(null)
   const resizeRef = useRef<ResizeState | null>(null)
 
+  /** Starts a move drag from the note's top handle (left mouse button only). */
   function handlePointerDown(e: PointerEvent<HTMLDivElement>) {
     if (e.button !== 0) return
     e.currentTarget.setPointerCapture(e.pointerId)
@@ -45,6 +47,7 @@ export function PostIt({ note, zoom, onMove, onResize, onDragEnd, onTextChange, 
     }
   }
 
+  /** Moves the note by the pointer's screen-space delta, converted to canvas units via the current zoom. */
   function handlePointerMove(e: PointerEvent<HTMLDivElement>) {
     const drag = dragRef.current
     if (!drag || drag.pointerId !== e.pointerId) return
@@ -55,6 +58,7 @@ export function PostIt({ note, zoom, onMove, onResize, onDragEnd, onTextChange, 
     )
   }
 
+  /** Ends the move drag and notifies the board so it can re-fit the canvas boundary. */
   function handlePointerUp(e: PointerEvent<HTMLDivElement>) {
     if (!dragRef.current) return
     dragRef.current = null
@@ -62,6 +66,7 @@ export function PostIt({ note, zoom, onMove, onResize, onDragEnd, onTextChange, 
     onDragEnd()
   }
 
+  /** Starts a resize drag from the bottom-right handle (left mouse button only). */
   function handleResizePointerDown(e: PointerEvent<HTMLDivElement>) {
     if (e.button !== 0) return
     e.stopPropagation()
@@ -75,6 +80,7 @@ export function PostIt({ note, zoom, onMove, onResize, onDragEnd, onTextChange, 
     }
   }
 
+  /** Resizes the note by the pointer's screen-space delta, clamped to a minimum size. */
   function handleResizePointerMove(e: PointerEvent<HTMLDivElement>) {
     const resize = resizeRef.current
     if (!resize || resize.pointerId !== e.pointerId) return
@@ -83,6 +89,7 @@ export function PostIt({ note, zoom, onMove, onResize, onDragEnd, onTextChange, 
     onResize(note.id, width, height)
   }
 
+  /** Ends the resize drag and notifies the board so it can re-fit the canvas boundary. */
   function handleResizePointerUp(e: PointerEvent<HTMLDivElement>) {
     if (!resizeRef.current) return
     resizeRef.current = null

@@ -3,6 +3,7 @@ import type { Note } from './types'
 const NOTES_KEY = 'anotador.notes'
 const VIEWPORT_KEY = 'anotador.viewport'
 
+/** Loads saved notes from localStorage. Fills in width/height defaults for notes saved before resizing existed. */
 export function loadNotes(): Note[] {
   const raw = localStorage.getItem(NOTES_KEY)
   if (!raw) return []
@@ -20,6 +21,7 @@ export function loadNotes(): Note[] {
   }
 }
 
+/** Persists all notes to localStorage. */
 export function saveNotes(notes: Note[]) {
   localStorage.setItem(NOTES_KEY, JSON.stringify(notes))
 }
@@ -31,6 +33,7 @@ export interface Viewport {
 
 const DEFAULT_VIEWPORT: Viewport = { pan: { x: 0, y: 0 }, zoom: 1 }
 
+/** Loads the saved pan/zoom viewport from localStorage, falling back to the default if missing or invalid. */
 export function loadViewport(): Viewport {
   const raw = localStorage.getItem(VIEWPORT_KEY)
   if (!raw) return DEFAULT_VIEWPORT
@@ -50,6 +53,7 @@ export function loadViewport(): Viewport {
   }
 }
 
+/** Persists the pan/zoom viewport to localStorage. */
 export function saveViewport(viewport: Viewport) {
   localStorage.setItem(VIEWPORT_KEY, JSON.stringify(viewport))
 }

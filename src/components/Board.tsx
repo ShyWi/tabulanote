@@ -11,10 +11,12 @@ const ZOOM_MIN = 0.4
 const ZOOM_MAX = 2
 const ZOOM_STEP = 0.1
 
+/** Restricts a zoom value to the [ZOOM_MIN, ZOOM_MAX] range. */
 function clampZoomValue(value: number) {
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value))
 }
 
+/** Builds a new note at a random spot near the top-left, with a random color. */
 function createNote(): Note {
   return {
     id: crypto.randomUUID(),
@@ -35,6 +37,7 @@ interface PanState {
   panY: number
 }
 
+/** The main canvas: renders every note, and owns panning, zooming and the canvas boundary. */
 export function Board() {
   const [notes, setNotes] = useState<Note[]>(loadNotes)
   // Snapshot of notes the canvas boundary is fitted to. It only updates when a
@@ -50,6 +53,7 @@ export function Board() {
 
   const bounds = useMemo(() => computeBoundsForNotes(boundsNotes), [boundsNotes])
 
+  // Persist notes to localStorage whenever they change.
   useEffect(() => {
     saveNotes(notes)
   }, [notes])
@@ -60,14 +64,17 @@ export function Board() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notes.length])
 
+  /** Re-fits the canvas boundary to the notes' current positions/sizes. Called when a drag or resize ends. */
   function commitBounds() {
     setBoundsNotes(notes)
   }
 
+  // Persist the pan/zoom viewport to localStorage whenever it changes.
   useEffect(() => {
     saveViewport({ pan, zoom })
   }, [pan, zoom])
 
+  /** Reads the board's current on-screen size, falling back to the window size before it's mounted. */
   function viewportSize() {
     const board = boardRef.current
     return board ? { width: board.clientWidth, height: board.clientHeight } : { width: window.innerWidth, height: window.innerHeight }
@@ -81,6 +88,7 @@ export function Board() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bounds])
 
+  /** Sets zoom (clamped to range) and re-clamps pan so the view stays valid at the new zoom level. */
   function setZoomClamped(nextZoom: number) {
     const z = clampZoomValue(nextZoom)
     setZoom(z)
@@ -88,6 +96,7 @@ export function Board() {
     setPan((prev) => clampPan(prev, z, bounds, width, height))
   }
 
+  // Intercepts Ctrl/Cmd +, -, and 0 so they drive our own zoom instead of the browser's page zoom.
   useEffect(() => {
     function blockBrowserZoomKeys(e: KeyboardEvent) {
       if (!(e.ctrlKey || e.metaKey)) return
@@ -122,6 +131,7 @@ export function Board() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zoom, bounds])
 
+  /** Starts panning the canvas when the middle mouse button is pressed on empty space. */
   function handleBoardPointerDown(e: PointerEvent<HTMLDivElement>) {
     if (e.button !== 1) return
     e.preventDefault()
@@ -130,6 +140,7 @@ export function Board() {
     setIsPanning(true)
   }
 
+  /** Updates pan 1:1 with pointer movement while a middle-button pan is in progress. */
   function handleBoardPointerMove(e: PointerEvent<HTMLDivElement>) {
     const drag = panRef.current
     if (!drag || drag.pointerId !== e.pointerId) return
@@ -145,6 +156,7 @@ export function Board() {
     )
   }
 
+  /** Ends the middle-button pan gesture. */
   function handleBoardPointerUp(e: PointerEvent<HTMLDivElement>) {
     if (!panRef.current || panRef.current.pointerId !== e.pointerId) return
     panRef.current = null
@@ -152,32 +164,39 @@ export function Board() {
     e.currentTarget.releasePointerCapture(e.pointerId)
   }
 
+  /** Adds a new note to the board. */
   function addNote() {
     setNotes((prev) => [...prev, createNote()])
   }
 
+  /** Updates a note's position (called continuously while it's being dragged). */
   function moveNote(id: string, x: number, y: number) {
     setNotes((prev) => prev.map((note) => (note.id === id ? { ...note, x, y } : note)))
   }
 
+  /** Updates a note's size (called continuously while it's being resized). */
   function resizeNote(id: string, width: number, height: number) {
     setNotes((prev) => prev.map((note) => (note.id === id ? { ...note, width, height } : note)))
   }
 
+  /** Updates a note's text content. */
   function updateText(id: string, text: string) {
     setNotes((prev) => prev.map((note) => (note.id === id ? { ...note, text } : note)))
   }
 
+  /** Deletes a note from the board. */
   function removeNote(id: string) {
     setNotes((prev) => prev.filter((note) => note.id !== id))
   }
 
+  /** Pans horizontally so the given 0-1 ratio along the canvas width becomes the view's center. */
   function scrollToX(ratio: number) {
     const { width, height } = viewportSize()
     const x = panFromScrollRatio('x', ratio, zoom, bounds, width, height)
     setPan((prev) => clampPan({ x, y: prev.y }, zoom, bounds, width, height))
   }
 
+  /** Pans vertically so the given 0-1 ratio along the canvas height becomes the view's center. */
   function scrollToY(ratio: number) {
     const { width, height } = viewportSize()
     const y = panFromScrollRatio('y', ratio, zoom, bounds, width, height)

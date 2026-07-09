@@ -58,6 +58,7 @@ export function clampPan(
   }
 }
 
+/** Restricts a value to the [0, 1] range. */
 function clamp01(value: number) {
   return Math.min(1, Math.max(0, value))
 }
