@@ -1,4 +1,4 @@
-# Anotador
+# TabulaNote
 
 Tablero de post-its infinito construido con React, TypeScript y Vite. Se van agregando funcionalidades paso a paso.
 

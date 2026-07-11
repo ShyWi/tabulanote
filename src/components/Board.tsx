@@ -4,8 +4,10 @@ import { loadNotes, loadViewport, saveNotes, saveViewport } from '../storage'
 import { clampPan, computeBoundsForNotes, computeScrollMetrics, panFromScrollRatio } from '../bounds'
 import { PostIt } from './PostIt'
 import { Scrollbar } from './Scrollbar'
+import { Toolbar } from './Toolbar'
 
 const COLORS = ['#fff59d', '#ffccbc', '#c8e6c9', '#bbdefb', '#e1bee7']
+const NOTE_SIZE = 180
 
 const ZOOM_MIN = 0.4
 const ZOOM_MAX = 2
@@ -16,14 +18,14 @@ function clampZoomValue(value: number) {
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value))
 }
 
-/** Builds a new note at a random spot near the top-left, with a random color. */
-function createNote(): Note {
+/** Builds a new note centered on the given canvas coordinates, with a random color. */
+function createNoteAt(x: number, y: number): Note {
   return {
     id: crypto.randomUUID(),
-    x: 80 + Math.random() * 160,
-    y: 80 + Math.random() * 120,
-    width: 180,
-    height: 180,
+    x: x - NOTE_SIZE / 2,
+    y: y - NOTE_SIZE / 2,
+    width: NOTE_SIZE,
+    height: NOTE_SIZE,
     text: '',
     color: COLORS[Math.floor(Math.random() * COLORS.length)],
   }
@@ -37,6 +39,11 @@ interface PanState {
   panY: number
 }
 
+interface GhostState {
+  clientX: number
+  clientY: number
+}
+
 /** The main canvas: renders every note, and owns panning, zooming and the canvas boundary. */
 export function Board() {
   const [notes, setNotes] = useState<Note[]>(loadNotes)
@@ -48,6 +55,7 @@ export function Board() {
   const [zoom, setZoom] = useState(initialViewport.zoom)
   const [pan, setPan] = useState(initialViewport.pan)
   const [isPanning, setIsPanning] = useState(false)
+  const [ghost, setGhost] = useState<GhostState | null>(null)
   const boardRef = useRef<HTMLDivElement>(null)
   const panRef = useRef<PanState | null>(null)
 
@@ -164,9 +172,35 @@ export function Board() {
     e.currentTarget.releasePointerCapture(e.pointerId)
   }
 
-  /** Adds a new note to the board. */
-  function addNote() {
-    setNotes((prev) => [...prev, createNote()])
+  /** Starts dragging a new note out of the toolbar's note icon. */
+  function handleNoteToolPointerDown(e: PointerEvent<HTMLButtonElement>) {
+    if (e.button !== 0) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setGhost({ clientX: e.clientX, clientY: e.clientY })
+  }
+
+  /** Follows the pointer with the ghost preview while dragging a new note out of the toolbar. */
+  function handleNoteToolPointerMove(e: PointerEvent<HTMLButtonElement>) {
+    if (!ghost) return
+    setGhost({ clientX: e.clientX, clientY: e.clientY })
+  }
+
+  /** Drops the new note onto the canvas if released over it, converting screen to canvas coordinates. */
+  function handleNoteToolPointerUp(e: PointerEvent<HTMLButtonElement>) {
+    if (!ghost) return
+    e.currentTarget.releasePointerCapture(e.pointerId)
+    setGhost(null)
+
+    const board = boardRef.current
+    if (!board) return
+    const rect = board.getBoundingClientRect()
+    const isOverCanvas =
+      e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom
+    if (!isOverCanvas) return
+
+    const canvasX = (e.clientX - rect.left - pan.x) / zoom
+    const canvasY = (e.clientY - rect.top - pan.y) / zoom
+    setNotes((prev) => [...prev, createNoteAt(canvasX, canvasY)])
   }
 
   /** Updates a note's position (called continuously while it's being dragged). */
@@ -207,50 +241,58 @@ export function Board() {
   const scrollMetrics = computeScrollMetrics(pan, zoom, bounds, viewportWidth, viewportHeight)
 
   return (
-    <div
-      className={`board ${isPanning ? 'is-panning' : ''}`}
-      ref={boardRef}
-      onPointerDown={handleBoardPointerDown}
-      onPointerMove={handleBoardPointerMove}
-      onPointerUp={handleBoardPointerUp}
-    >
-      <button type="button" className="board__add" onClick={addNote}>
-        + Nueva nota
-      </button>
-
-      <div className="board__zoom">
-        <button type="button" onClick={() => setZoomClamped(zoom - ZOOM_STEP)} aria-label="Alejar">
-          −
-        </button>
-        <span>{Math.round(zoom * 100)}%</span>
-        <button type="button" onClick={() => setZoomClamped(zoom + ZOOM_STEP)} aria-label="Acercar">
-          +
-        </button>
-        <button type="button" className="board__zoom-reset" onClick={() => setZoomClamped(1)}>
-          Reset
-        </button>
-      </div>
+    <div className="app-shell">
+      <Toolbar
+        onNoteToolPointerDown={handleNoteToolPointerDown}
+        onNoteToolPointerMove={handleNoteToolPointerMove}
+        onNoteToolPointerUp={handleNoteToolPointerUp}
+      />
 
       <div
-        className="board__canvas"
-        style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
+        className={`board ${isPanning ? 'is-panning' : ''}`}
+        ref={boardRef}
+        onPointerDown={handleBoardPointerDown}
+        onPointerMove={handleBoardPointerMove}
+        onPointerUp={handleBoardPointerUp}
       >
-        {notes.map((note) => (
-          <PostIt
-            key={note.id}
-            note={note}
-            zoom={zoom}
-            onMove={moveNote}
-            onResize={resizeNote}
-            onDragEnd={commitBounds}
-            onTextChange={updateText}
-            onRemove={removeNote}
-          />
-        ))}
+        <div className="board__zoom">
+          <button type="button" onClick={() => setZoomClamped(zoom - ZOOM_STEP)} aria-label="Alejar">
+            −
+          </button>
+          <span>{Math.round(zoom * 100)}%</span>
+          <button type="button" onClick={() => setZoomClamped(zoom + ZOOM_STEP)} aria-label="Acercar">
+            +
+          </button>
+          <button type="button" className="board__zoom-reset" onClick={() => setZoomClamped(1)}>
+            Reset
+          </button>
+        </div>
+
+        <div
+          className="board__canvas"
+          style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
+        >
+          {notes.map((note) => (
+            <PostIt
+              key={note.id}
+              note={note}
+              zoom={zoom}
+              onMove={moveNote}
+              onResize={resizeNote}
+              onDragEnd={commitBounds}
+              onTextChange={updateText}
+              onRemove={removeNote}
+            />
+          ))}
+        </div>
+
+        <Scrollbar orientation="horizontal" start={scrollMetrics.startX} size={scrollMetrics.sizeX} onScrollTo={scrollToX} />
+        <Scrollbar orientation="vertical" start={scrollMetrics.startY} size={scrollMetrics.sizeY} onScrollTo={scrollToY} />
       </div>
 
-      <Scrollbar orientation="horizontal" start={scrollMetrics.startX} size={scrollMetrics.sizeX} onScrollTo={scrollToX} />
-      <Scrollbar orientation="vertical" start={scrollMetrics.startY} size={scrollMetrics.sizeY} onScrollTo={scrollToY} />
+      {ghost && (
+        <div className="create-ghost" style={{ left: ghost.clientX, top: ghost.clientY }} aria-hidden="true" />
+      )}
     </div>
   )
 }
