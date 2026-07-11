@@ -103,6 +103,30 @@ export function Board() {
 
   const bounds = useMemo(() => computeBounds(boundsItems), [boundsItems])
 
+  // Each time this canvas mounts (e.g. after navigating into/out of a
+  // folder, which remounts Board via its `key`), guard against anything
+  // ending up focused for a brief grace period. On mobile, tapping a folder
+  // to open it can be followed by the browser's delayed synthetic "click"
+  // landing on whatever now sits at that screen position in the freshly
+  // mounted canvas — e.g. a note's textarea — stealing focus and popping up
+  // the keyboard unexpectedly. Any focus landing inside the board within this
+  // window is treated as such a ghost event and immediately reverted.
+  useEffect(() => {
+    const board = boardRef.current
+    if (!board) return
+
+    function rejectStrayFocus(e: FocusEvent) {
+      ;(e.target as HTMLElement | null)?.blur()
+    }
+
+    board.addEventListener('focusin', rejectStrayFocus)
+    const id = window.setTimeout(() => board.removeEventListener('focusin', rejectStrayFocus), 400)
+    return () => {
+      window.clearTimeout(id)
+      board.removeEventListener('focusin', rejectStrayFocus)
+    }
+  }, [])
+
   // Persist notes/folders to localStorage whenever they change.
   useEffect(() => {
     saveNotes(scope, notes)

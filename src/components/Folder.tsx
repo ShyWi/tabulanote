@@ -32,6 +32,11 @@ export function Folder({ folder, zoom, isDropTarget, onMove, onDragEnd, onOpen, 
   /** Starts tracking a potential move drag from anywhere on the folder (left mouse button only). */
   function handlePointerDown(e: PointerEvent<HTMLDivElement>) {
     if (e.button !== 0) return
+    // Suppresses the browser's delayed compatibility "click" that follows a
+    // touch tap. Without this, opening a folder navigates (remounting the
+    // board) and that ghost click then lands on whatever ends up at that
+    // screen position — e.g. a post-it's textarea — stealing focus on mobile.
+    e.preventDefault()
     dragRef.current = {
       pointerId: e.pointerId,
       startX: e.clientX,
@@ -66,6 +71,9 @@ export function Folder({ folder, zoom, isDropTarget, onMove, onDragEnd, onOpen, 
   function handlePointerUp(e: PointerEvent<HTMLDivElement>) {
     const drag = dragRef.current
     if (!drag) return
+    // Also suppresses the browser's synthetic "click" here — preventDefault
+    // on pointerdown alone stops compat mousedown/mouseup but not click.
+    e.preventDefault()
     dragRef.current = null
     if (drag.moved) {
       e.currentTarget.releasePointerCapture(e.pointerId)
