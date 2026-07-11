@@ -139,9 +139,16 @@ export function Board() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zoom, bounds])
 
-  /** Starts panning the canvas when the middle mouse button is pressed on empty space. */
+  /**
+   * Starts panning the canvas: middle mouse button anywhere, or the primary
+   * button/touch when pressed directly on empty canvas (not a note or a
+   * control) — there's no middle mouse button on a phone, so this is how
+   * panning works on touch.
+   */
   function handleBoardPointerDown(e: PointerEvent<HTMLDivElement>) {
-    if (e.button !== 1) return
+    const target = e.target as HTMLElement
+    const isEmptyCanvas = target === e.currentTarget || target.hasAttribute('data-board-canvas')
+    if (e.button !== 1 && !(e.button === 0 && isEmptyCanvas)) return
     e.preventDefault()
     e.currentTarget.setPointerCapture(e.pointerId)
     panRef.current = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y }
@@ -241,7 +248,7 @@ export function Board() {
   const scrollMetrics = computeScrollMetrics(pan, zoom, bounds, viewportWidth, viewportHeight)
 
   return (
-    <div className="app-shell">
+    <div className="flex h-screen flex-col">
       <Toolbar
         onNoteToolPointerDown={handleNoteToolPointerDown}
         onNoteToolPointerMove={handleNoteToolPointerMove}
@@ -249,28 +256,47 @@ export function Board() {
       />
 
       <div
-        className={`board ${isPanning ? 'is-panning' : ''}`}
+        className={`board relative min-h-0 flex-1 touch-none overflow-hidden bg-neutral-100 bg-[radial-gradient(#d7dbe0_1px,transparent_1px)] [background-size:24px_24px] ${
+          isPanning ? 'cursor-grabbing select-none' : ''
+        }`}
         ref={boardRef}
         onPointerDown={handleBoardPointerDown}
         onPointerMove={handleBoardPointerMove}
         onPointerUp={handleBoardPointerUp}
       >
-        <div className="board__zoom">
-          <button type="button" onClick={() => setZoomClamped(zoom - ZOOM_STEP)} aria-label="Alejar">
+        <div className="board__zoom absolute right-3 bottom-3 z-20 flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1.5 shadow-md sm:right-4 sm:bottom-4">
+          <button
+            type="button"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-100 text-lg leading-none text-neutral-800 hover:bg-neutral-200"
+            onClick={() => setZoomClamped(zoom - ZOOM_STEP)}
+            aria-label="Alejar"
+          >
             −
           </button>
-          <span>{Math.round(zoom * 100)}%</span>
-          <button type="button" onClick={() => setZoomClamped(zoom + ZOOM_STEP)} aria-label="Acercar">
+          <span className="min-w-[3ch] text-center text-sm font-semibold text-neutral-600">
+            {Math.round(zoom * 100)}%
+          </span>
+          <button
+            type="button"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-100 text-lg leading-none text-neutral-800 hover:bg-neutral-200"
+            onClick={() => setZoomClamped(zoom + ZOOM_STEP)}
+            aria-label="Acercar"
+          >
             +
           </button>
-          <button type="button" className="board__zoom-reset" onClick={() => setZoomClamped(1)}>
+          <button
+            type="button"
+            className="h-8 rounded-full bg-neutral-100 px-2.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-200"
+            onClick={() => setZoomClamped(1)}
+          >
             Reset
           </button>
         </div>
 
         <div
-          className="board__canvas"
-          style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
+          data-board-canvas
+          className="board__canvas absolute inset-0"
+          style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0' }}
         >
           {notes.map((note) => (
             <PostIt
@@ -291,7 +317,11 @@ export function Board() {
       </div>
 
       {ghost && (
-        <div className="create-ghost" style={{ left: ghost.clientX, top: ghost.clientY }} aria-hidden="true" />
+        <div
+          className="create-ghost fixed z-30 -mt-7.5 -ml-7.5 h-15 w-15 rounded border border-[#c9b94a] bg-[#fff59d] opacity-85 shadow-[3px_4px_10px_rgba(0,0,0,0.25)] pointer-events-none"
+          style={{ left: ghost.clientX, top: ghost.clientY }}
+          aria-hidden="true"
+        />
       )}
     </div>
   )

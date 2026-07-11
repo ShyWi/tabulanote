@@ -9,10 +9,10 @@ interface Props {
 /** Top toolbar. Currently holds the "drag a post-it onto the canvas" tool; built to grow with more tools later. */
 export function Toolbar({ onNoteToolPointerDown, onNoteToolPointerMove, onNoteToolPointerUp }: Props) {
   return (
-    <div className="toolbar">
+    <div className="toolbar z-20 flex shrink-0 items-center gap-2 border-b border-neutral-200 bg-white px-3 py-2 sm:px-4">
       <button
         type="button"
-        className="toolbar__icon"
+        className="toolbar__icon flex h-11 w-11 touch-none cursor-grab items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 active:cursor-grabbing"
         onPointerDown={onNoteToolPointerDown}
         onPointerMove={onNoteToolPointerMove}
         onPointerUp={onNoteToolPointerUp}

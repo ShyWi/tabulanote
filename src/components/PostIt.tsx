@@ -99,18 +99,18 @@ export function PostIt({ note, zoom, onMove, onResize, onDragEnd, onTextChange, 
 
   return (
     <div
-      className="postit"
+      className="postit absolute flex flex-col rounded shadow-[3px_4px_10px_rgba(0,0,0,0.25)]"
       style={{ left: note.x, top: note.y, width: note.width, height: note.height, background: note.color }}
     >
       <div
-        className="postit__handle"
+        className="postit__handle flex h-7 touch-none cursor-grab justify-end active:cursor-grabbing"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
       >
         <button
           type="button"
-          className="postit__close"
+          className="postit__close cursor-pointer border-0 bg-transparent px-2.5 py-1 text-base leading-none text-black/50 hover:text-black/80"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={() => onRemove(note.id)}
           aria-label="Eliminar nota"
@@ -119,13 +119,13 @@ export function PostIt({ note, zoom, onMove, onResize, onDragEnd, onTextChange, 
         </button>
       </div>
       <textarea
-        className="postit__text"
+        className="postit__text flex-1 resize-none border-0 bg-transparent px-3 pb-3 font-[inherit] text-[0.95rem] text-neutral-800 focus:outline-none"
         value={note.text}
         onChange={(e) => onTextChange(note.id, e.target.value)}
         placeholder="Escribe algo..."
       />
       <div
-        className="postit__resize"
+        className="postit__resize absolute right-0 bottom-0 flex h-6 w-6 touch-none items-end justify-end p-1 cursor-nwse-resize"
         onPointerDown={handleResizePointerDown}
         onPointerMove={handleResizePointerMove}
         onPointerUp={handleResizePointerUp}
