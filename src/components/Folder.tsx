@@ -4,6 +4,8 @@ import type { Folder as FolderData } from '../types'
 interface Props {
   folder: FolderData
   zoom: number
+  /** True while a note is being dragged over this folder — highlights it as a drop target. */
+  isDropTarget: boolean
   onMove: (id: string, x: number, y: number) => void
   onDragEnd: () => void
   onOpen: (name: string) => void
@@ -24,7 +26,7 @@ interface DragState {
 const DRAG_THRESHOLD = 4
 
 /** A draggable folder icon on the canvas. Click (without dragging) opens its own independent canvas. */
-export function Folder({ folder, zoom, onMove, onDragEnd, onOpen, onRemove }: Props) {
+export function Folder({ folder, zoom, isDropTarget, onMove, onDragEnd, onOpen, onRemove }: Props) {
   const dragRef = useRef<DragState | null>(null)
 
   /** Starts tracking a potential move drag from anywhere on the folder (left mouse button only). */
@@ -75,7 +77,9 @@ export function Folder({ folder, zoom, onMove, onDragEnd, onOpen, onRemove }: Pr
 
   return (
     <div
-      className="folder absolute flex touch-none cursor-pointer flex-col items-center rounded-lg border border-blue-200 bg-blue-50 p-2 shadow-[3px_4px_10px_rgba(0,0,0,0.2)] select-none"
+      className={`folder absolute flex touch-none cursor-pointer flex-col items-center rounded-lg border p-2 shadow-[3px_4px_10px_rgba(0,0,0,0.2)] select-none ${
+        isDropTarget ? 'border-blue-500 bg-blue-200 ring-4 ring-blue-300' : 'border-blue-200 bg-blue-50'
+      }`}
       style={{ left: folder.x, top: folder.y, width: folder.width, height: folder.height }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -87,7 +91,9 @@ export function Folder({ folder, zoom, onMove, onDragEnd, onOpen, onRemove }: Pr
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation()
-          onRemove(folder.id)
+          if (window.confirm(`¿Eliminar la carpeta "${folder.name}"? Su contenido dejará de ser accesible.`)) {
+            onRemove(folder.id)
+          }
         }}
         aria-label="Eliminar carpeta"
       >

@@ -9,6 +9,11 @@ export interface Bounds {
 
 export const DEFAULT_BOUNDS: Bounds = { minX: 0, minY: 0, maxX: 2000, maxY: 1400 }
 
+/** Whether two axis-aligned rects (in the same coordinate space) overlap at all. */
+export function rectsOverlap(a: PositionedItem, b: PositionedItem) {
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
+}
+
 // How much room every note should keep around it before the canvas boundary.
 const EDGE_MARGIN = 300
 // How far past the canvas boundary the viewport is allowed to pan.

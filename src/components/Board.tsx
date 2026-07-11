@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { Folder as FolderData, Note } from '../types'
 import { loadFolders, loadNotes, loadViewport, saveFolders, saveNotes, saveViewport } from '../storage'
-import { clampPan, computeBounds, computeScrollMetrics, panFromScrollRatio } from '../bounds'
+import { clampPan, computeBounds, computeScrollMetrics, panFromScrollRatio, rectsOverlap } from '../bounds'
 import { PostIt } from './PostIt'
 import { Folder } from './Folder'
 import { Scrollbar } from './Scrollbar'
@@ -57,6 +57,18 @@ interface PanState {
   panY: number
 }
 
+interface PinchState {
+  initialDistance: number
+  initialZoom: number
+  /** Canvas-space point under the pinch midpoint, kept visually anchored as the zoom changes. */
+  anchor: { x: number; y: number }
+}
+
+/** Straight-line distance between two client-space points. */
+function distanceBetween(a: { x: number; y: number }, b: { x: number; y: number }) {
+  return Math.hypot(a.x - b.x, a.y - b.y)
+}
+
 interface GhostState {
   kind: 'note' | 'folder'
   clientX: number
@@ -80,8 +92,14 @@ export function Board() {
   const [pan, setPan] = useState(initialViewport.pan)
   const [isPanning, setIsPanning] = useState(false)
   const [ghost, setGhost] = useState<GhostState | null>(null)
+  // Set while a note is being dragged over a folder, so the folder can highlight itself as a drop target.
+  const [dropTargetFolderId, setDropTargetFolderId] = useState<string | null>(null)
   const boardRef = useRef<HTMLDivElement>(null)
   const panRef = useRef<PanState | null>(null)
+  // Tracks every touch pointer currently down on the board, in client-space
+  // coordinates, so a second finger arriving can be detected as a pinch.
+  const activeTouchesRef = useRef<Map<number, { x: number; y: number }>>(new Map())
+  const pinchRef = useRef<PinchState | null>(null)
 
   const bounds = useMemo(() => computeBounds(boundsItems), [boundsItems])
 
@@ -171,20 +189,83 @@ export function Board() {
    * Starts panning the canvas: middle mouse button anywhere, or the primary
    * button/touch when pressed directly on empty canvas (not a note, folder or
    * a control) — there's no middle mouse button on a phone, so this is how
-   * panning works on touch.
+   * panning works on touch. Since this preventDefault()s, the browser's usual
+   * "clicking elsewhere blurs the focused element" doesn't happen on its own,
+   * so a focused note's textarea would otherwise keep eating keystrokes even
+   * after clicking away from it — blur explicitly to fix that.
+   *
+   * A second finger touching down while a first is already on the board
+   * starts a pinch-to-zoom instead (there's no Ctrl+wheel on a phone either).
    */
   function handleBoardPointerDown(e: PointerEvent<HTMLDivElement>) {
+    if (e.pointerType === 'touch') {
+      activeTouchesRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+
+      if (activeTouchesRef.current.size === 2) {
+        // A pinch is starting: cancel any single-finger pan already in progress.
+        panRef.current = null
+        setIsPanning(false)
+
+        const [p1, p2] = Array.from(activeTouchesRef.current.values())
+        const midX = (p1.x + p2.x) / 2
+        const midY = (p1.y + p2.y) / 2
+        pinchRef.current = {
+          initialDistance: distanceBetween(p1, p2),
+          initialZoom: zoom,
+          anchor: canvasPointFromClient(midX, midY) ?? { x: 0, y: 0 },
+        }
+        return
+      }
+
+      if (activeTouchesRef.current.size > 2) return
+    }
+
+    if (pinchRef.current) return
+
     const target = e.target as HTMLElement
     const isEmptyCanvas = target === e.currentTarget || target.hasAttribute('data-board-canvas')
     if (e.button !== 1 && !(e.button === 0 && isEmptyCanvas)) return
     e.preventDefault()
-    e.currentTarget.setPointerCapture(e.pointerId)
+    ;(document.activeElement as HTMLElement | null)?.blur()
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {
+      // Ignore: the pointer may no longer be active (e.g. lifted mid-gesture).
+    }
     panRef.current = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y }
     setIsPanning(true)
   }
 
-  /** Updates pan 1:1 with pointer movement while a middle-button pan is in progress. */
+  /** Updates pan 1:1 with pointer movement (single-finger pan), or zoom+pan together while pinching with two fingers. */
   function handleBoardPointerMove(e: PointerEvent<HTMLDivElement>) {
+    if (e.pointerType === 'touch' && activeTouchesRef.current.has(e.pointerId)) {
+      activeTouchesRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    }
+
+    if (pinchRef.current && activeTouchesRef.current.size === 2) {
+      const pinch = pinchRef.current
+      const [p1, p2] = Array.from(activeTouchesRef.current.values())
+      const midX = (p1.x + p2.x) / 2
+      const midY = (p1.y + p2.y) / 2
+      const board = boardRef.current
+      if (!board) return
+      const rect = board.getBoundingClientRect()
+
+      const newZoom = clampZoomValue(pinch.initialZoom * (distanceBetween(p1, p2) / pinch.initialDistance))
+      const { width, height } = viewportSize()
+      setZoom(newZoom)
+      setPan(
+        clampPan(
+          { x: midX - rect.left - pinch.anchor.x * newZoom, y: midY - rect.top - pinch.anchor.y * newZoom },
+          newZoom,
+          bounds,
+          width,
+          height,
+        ),
+      )
+      return
+    }
+
     const drag = panRef.current
     if (!drag || drag.pointerId !== e.pointerId) return
     const { width, height } = viewportSize()
@@ -199,8 +280,15 @@ export function Board() {
     )
   }
 
-  /** Ends the middle-button pan gesture. */
+  /** Ends a pan or pinch gesture as its pointers lift (or get cancelled by the OS). */
   function handleBoardPointerUp(e: PointerEvent<HTMLDivElement>) {
+    if (e.pointerType === 'touch') {
+      activeTouchesRef.current.delete(e.pointerId)
+      if (pinchRef.current && activeTouchesRef.current.size < 2) {
+        pinchRef.current = null
+      }
+    }
+
     if (!panRef.current || panRef.current.pointerId !== e.pointerId) return
     panRef.current = null
     setIsPanning(false)
@@ -257,9 +345,37 @@ export function Board() {
     if (folder) setFolders((prev) => [...prev, folder])
   }
 
-  /** Updates a note's position (called continuously while it's being dragged). */
+  /** Updates a note's position, and tracks whether it's currently hovering a folder (to highlight it as a drop target). */
   function moveNote(id: string, x: number, y: number) {
     setNotes((prev) => prev.map((note) => (note.id === id ? { ...note, x, y } : note)))
+    const note = notes.find((n) => n.id === id)
+    if (!note) return
+    const hovered = folders.find((folder) => rectsOverlap({ x, y, width: note.width, height: note.height }, folder))
+    setDropTargetFolderId(hovered ? hovered.id : null)
+  }
+
+  /**
+   * Called when a note's move drag ends. If it was released on top of a
+   * folder, the note is moved OUT of this canvas and INTO that folder's own
+   * canvas (written straight to its localStorage scope). Otherwise it's just
+   * a normal reposition, so re-fit the canvas boundary as usual.
+   */
+  function handleNoteMoveEnd(id: string) {
+    const folderId = dropTargetFolderId
+    setDropTargetFolderId(null)
+    const targetFolder = folderId ? folders.find((f) => f.id === folderId) : undefined
+    if (!targetFolder) {
+      commitBounds()
+      return
+    }
+
+    const note = notes.find((n) => n.id === id)
+    if (!note) return
+    setNotes((prev) => prev.filter((n) => n.id !== id))
+
+    const destinationNotes = loadNotes(targetFolder.name)
+    const relocated: Note = { ...note, x: 80 + Math.random() * 160, y: 80 + Math.random() * 120 }
+    saveNotes(targetFolder.name, [...destinationNotes, relocated])
   }
 
   /** Updates a note's size (called continuously while it's being resized). */
@@ -318,6 +434,7 @@ export function Board() {
         onFolderToolPointerDown={handleFolderToolPointerDown}
         onFolderToolPointerMove={handleToolPointerMove}
         onFolderToolPointerUp={handleFolderToolPointerUp}
+        foldersDisabled={scope !== ''}
         currentFolderName={scope || undefined}
         onBack={() => navigate('/')}
       />
@@ -330,6 +447,7 @@ export function Board() {
         onPointerDown={handleBoardPointerDown}
         onPointerMove={handleBoardPointerMove}
         onPointerUp={handleBoardPointerUp}
+        onPointerCancel={handleBoardPointerUp}
       >
         <div className="board__zoom absolute right-3 bottom-3 z-20 flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1.5 shadow-md sm:right-4 sm:bottom-4">
           <button
@@ -371,8 +489,9 @@ export function Board() {
               note={note}
               zoom={zoom}
               onMove={moveNote}
+              onMoveEnd={handleNoteMoveEnd}
               onResize={resizeNote}
-              onDragEnd={commitBounds}
+              onResizeEnd={commitBounds}
               onTextChange={updateText}
               onRemove={removeNote}
             />
@@ -382,6 +501,7 @@ export function Board() {
               key={folder.id}
               folder={folder}
               zoom={zoom}
+              isDropTarget={folder.id === dropTargetFolderId}
               onMove={moveFolder}
               onDragEnd={commitBounds}
               onOpen={openFolder}

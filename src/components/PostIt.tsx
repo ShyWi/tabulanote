@@ -5,8 +5,9 @@ interface Props {
   note: Note
   zoom: number
   onMove: (id: string, x: number, y: number) => void
+  onMoveEnd: (id: string) => void
   onResize: (id: string, width: number, height: number) => void
-  onDragEnd: () => void
+  onResizeEnd: () => void
   onTextChange: (id: string, text: string) => void
   onRemove: (id: string) => void
 }
@@ -34,7 +35,7 @@ const MIN_SIZE = 120
 const DRAG_THRESHOLD = 4
 
 /** A single draggable, resizable, editable sticky note. Draggable from anywhere on it, including over the text. */
-export function PostIt({ note, zoom, onMove, onResize, onDragEnd, onTextChange, onRemove }: Props) {
+export function PostIt({ note, zoom, onMove, onMoveEnd, onResize, onResizeEnd, onTextChange, onRemove }: Props) {
   const dragRef = useRef<DragState | null>(null)
   const resizeRef = useRef<ResizeState | null>(null)
 
@@ -77,14 +78,14 @@ export function PostIt({ note, zoom, onMove, onResize, onDragEnd, onTextChange, 
     )
   }
 
-  /** Ends the move drag (if it turned into one) and notifies the board so it can re-fit the canvas boundary. */
+  /** Ends the move drag (if it turned into one) and lets the board decide what happens next (re-fit bounds, or absorb the note into a folder it was dropped on). */
   function handlePointerUp(e: PointerEvent<HTMLDivElement>) {
     const drag = dragRef.current
     if (!drag) return
     dragRef.current = null
     if (drag.moved) {
       e.currentTarget.releasePointerCapture(e.pointerId)
-      onDragEnd()
+      onMoveEnd(note.id)
     }
   }
 
@@ -116,7 +117,7 @@ export function PostIt({ note, zoom, onMove, onResize, onDragEnd, onTextChange, 
     if (!resizeRef.current) return
     resizeRef.current = null
     e.currentTarget.releasePointerCapture(e.pointerId)
-    onDragEnd()
+    onResizeEnd()
   }
 
   return (
@@ -132,7 +133,9 @@ export function PostIt({ note, zoom, onMove, onResize, onDragEnd, onTextChange, 
           type="button"
           className="postit__close cursor-pointer border-0 bg-transparent px-2.5 py-1 text-base leading-none text-black/50 hover:text-black/80"
           onPointerDown={(e) => e.stopPropagation()}
-          onClick={() => onRemove(note.id)}
+          onClick={() => {
+            if (window.confirm('¿Eliminar esta nota?')) onRemove(note.id)
+          }}
           aria-label="Eliminar nota"
         >
           ×
