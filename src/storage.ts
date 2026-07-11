@@ -1,7 +1,7 @@
 import type { Note } from './types'
 
-const NOTES_KEY = 'anotador.notes'
-const VIEWPORT_KEY = 'anotador.viewport'
+const NOTES_KEY = 'tabulanote.notes'
+const VIEWPORT_KEY = 'tabulanote.viewport'
 
 /** Loads saved notes from localStorage. Fills in width/height defaults for notes saved before resizing existed. */
 export function loadNotes(): Note[] {
