@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>TabulaNote</title>
+    <script type="text/javascript">
+      // GitHub Pages is a static host, so a direct link/refresh into a
+      // client-side route (e.g. /tabulanote/MiCarpeta) 404s here. This
+      // redirects to index.html with the original path encoded in the query
+      // string; a matching script in index.html restores it before the app
+      // (and react-router) ever sees the URL. Standard trick, see:
+      // https://github.com/rafgraph/spa-github-pages
+      var pathSegmentsToKeep = 1 // keep the "/tabulanote" base path segment
+      var l = window.location
+      l.replace(
+        l.protocol +
+          '//' +
+          l.hostname +
+          (l.port ? ':' + l.port : '') +
+          l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') +
+          '/?/' +
+          l.pathname
+            .slice(1)
+            .split('/')
+            .slice(pathSegmentsToKeep)
+            .join('/')
+            .replace(/&/g, '~and~') +
+          (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+          l.hash,
+      )
+    </script>
+  </head>
+  <body></body>
+</html>
