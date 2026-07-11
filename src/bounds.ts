@@ -1,4 +1,4 @@
-import type { Note } from './types'
+import type { PositionedItem } from './types'
 
 export interface Bounds {
   minX: number
@@ -15,25 +15,26 @@ const EDGE_MARGIN = 300
 const PAN_OVERSHOOT = 200
 
 /**
- * Fits the bounds around all notes (plus EDGE_MARGIN), recomputed from scratch
- * every time, but never smaller than DEFAULT_BOUNDS. This lets the canvas both
- * grow and shrink: a note dragged toward an edge pushes it out, and dragging
- * it back toward the center lets the boundary shrink again — down to the
- * default floor, never below it (a tiny canvas would fight with dragging: if
- * it's smaller than the viewport, panning ends up recentering it every time a
- * note moves, which cancels out the drag itself).
+ * Fits the bounds around all items (notes and folders alike, plus
+ * EDGE_MARGIN), recomputed from scratch every time, but never smaller than
+ * DEFAULT_BOUNDS. This lets the canvas both grow and shrink: an item dragged
+ * toward an edge pushes it out, and dragging it back toward the center lets
+ * the boundary shrink again — down to the default floor, never below it (a
+ * tiny canvas would fight with dragging: if it's smaller than the viewport,
+ * panning ends up recentering it every time an item moves, which cancels out
+ * the drag itself).
  */
-export function computeBoundsForNotes(notes: Note[]): Bounds {
+export function computeBounds(items: PositionedItem[]): Bounds {
   let minX = DEFAULT_BOUNDS.minX
   let minY = DEFAULT_BOUNDS.minY
   let maxX = DEFAULT_BOUNDS.maxX
   let maxY = DEFAULT_BOUNDS.maxY
 
-  for (const note of notes) {
-    minX = Math.min(minX, note.x - EDGE_MARGIN)
-    minY = Math.min(minY, note.y - EDGE_MARGIN)
-    maxX = Math.max(maxX, note.x + note.width + EDGE_MARGIN)
-    maxY = Math.max(maxY, note.y + note.height + EDGE_MARGIN)
+  for (const item of items) {
+    minX = Math.min(minX, item.x - EDGE_MARGIN)
+    minY = Math.min(minY, item.y - EDGE_MARGIN)
+    maxX = Math.max(maxX, item.x + item.width + EDGE_MARGIN)
+    maxY = Math.max(maxY, item.y + item.height + EDGE_MARGIN)
   }
 
   return { minX, minY, maxX, maxY }

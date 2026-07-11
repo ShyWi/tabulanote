@@ -17,6 +17,7 @@ interface DragState {
   startY: number
   noteX: number
   noteY: number
+  moved: boolean
 }
 
 interface ResizeState {
@@ -28,29 +29,47 @@ interface ResizeState {
 }
 
 const MIN_SIZE = 120
+// Pointer must move this many screen pixels before a press-and-hold on the
+// note counts as a drag rather than a click that focuses the textarea.
+const DRAG_THRESHOLD = 4
 
-/** A single draggable, resizable, editable sticky note. */
+/** A single draggable, resizable, editable sticky note. Draggable from anywhere on it, including over the text. */
 export function PostIt({ note, zoom, onMove, onResize, onDragEnd, onTextChange, onRemove }: Props) {
   const dragRef = useRef<DragState | null>(null)
   const resizeRef = useRef<ResizeState | null>(null)
 
-  /** Starts a move drag from the note's top handle (left mouse button only). */
+  /** Starts tracking a potential move drag from anywhere on the note (left mouse button only). */
   function handlePointerDown(e: PointerEvent<HTMLDivElement>) {
     if (e.button !== 0) return
-    e.currentTarget.setPointerCapture(e.pointerId)
     dragRef.current = {
       pointerId: e.pointerId,
       startX: e.clientX,
       startY: e.clientY,
       noteX: note.x,
       noteY: note.y,
+      moved: false,
     }
   }
 
-  /** Moves the note by the pointer's screen-space delta, converted to canvas units via the current zoom. */
+  /**
+   * Moves the note once the pointer has traveled past the drag threshold.
+   * Capturing only starts at that point, so a plain click/tap still reaches
+   * the textarea underneath to place the cursor and type.
+   */
   function handlePointerMove(e: PointerEvent<HTMLDivElement>) {
     const drag = dragRef.current
     if (!drag || drag.pointerId !== e.pointerId) return
+
+    if (!drag.moved) {
+      const dx = e.clientX - drag.startX
+      const dy = e.clientY - drag.startY
+      if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return
+      drag.moved = true
+      e.currentTarget.setPointerCapture(e.pointerId)
+      ;(document.activeElement as HTMLElement | null)?.blur()
+      window.getSelection()?.removeAllRanges()
+    }
+
     onMove(
       note.id,
       drag.noteX + (e.clientX - drag.startX) / zoom,
@@ -58,12 +77,15 @@ export function PostIt({ note, zoom, onMove, onResize, onDragEnd, onTextChange, 
     )
   }
 
-  /** Ends the move drag and notifies the board so it can re-fit the canvas boundary. */
+  /** Ends the move drag (if it turned into one) and notifies the board so it can re-fit the canvas boundary. */
   function handlePointerUp(e: PointerEvent<HTMLDivElement>) {
-    if (!dragRef.current) return
+    const drag = dragRef.current
+    if (!drag) return
     dragRef.current = null
-    e.currentTarget.releasePointerCapture(e.pointerId)
-    onDragEnd()
+    if (drag.moved) {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+      onDragEnd()
+    }
   }
 
   /** Starts a resize drag from the bottom-right handle (left mouse button only). */
@@ -99,15 +121,13 @@ export function PostIt({ note, zoom, onMove, onResize, onDragEnd, onTextChange, 
 
   return (
     <div
-      className="postit absolute flex flex-col rounded shadow-[3px_4px_10px_rgba(0,0,0,0.25)]"
+      className="postit absolute flex touch-none flex-col rounded shadow-[3px_4px_10px_rgba(0,0,0,0.25)]"
       style={{ left: note.x, top: note.y, width: note.width, height: note.height, background: note.color }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
     >
-      <div
-        className="postit__handle flex h-7 touch-none cursor-grab justify-end active:cursor-grabbing"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-      >
+      <div className="postit__handle flex h-7 shrink-0 cursor-grab justify-end active:cursor-grabbing">
         <button
           type="button"
           className="postit__close cursor-pointer border-0 bg-transparent px-2.5 py-1 text-base leading-none text-black/50 hover:text-black/80"
@@ -119,7 +139,7 @@ export function PostIt({ note, zoom, onMove, onResize, onDragEnd, onTextChange, 
         </button>
       </div>
       <textarea
-        className="postit__text flex-1 resize-none border-0 bg-transparent px-3 pb-3 font-[inherit] text-[0.95rem] text-neutral-800 focus:outline-none"
+        className="postit__text flex-1 cursor-text resize-none border-0 bg-transparent px-3 pb-3 font-[inherit] text-[0.95rem] text-neutral-800 focus:outline-none"
         value={note.text}
         onChange={(e) => onTextChange(note.id, e.target.value)}
         placeholder="Escribe algo..."

@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
-import type { Note } from '../types'
-import { loadNotes, loadViewport, saveNotes, saveViewport } from '../storage'
-import { clampPan, computeBoundsForNotes, computeScrollMetrics, panFromScrollRatio } from '../bounds'
+import { useNavigate, useParams } from 'react-router-dom'
+import type { Folder as FolderData, Note } from '../types'
+import { loadFolders, loadNotes, loadViewport, saveFolders, saveNotes, saveViewport } from '../storage'
+import { clampPan, computeBounds, computeScrollMetrics, panFromScrollRatio } from '../bounds'
 import { PostIt } from './PostIt'
+import { Folder } from './Folder'
 import { Scrollbar } from './Scrollbar'
 import { Toolbar } from './Toolbar'
 
 const COLORS = ['#fff59d', '#ffccbc', '#c8e6c9', '#bbdefb', '#e1bee7']
 const NOTE_SIZE = 180
+const FOLDER_SIZE = 100
 
 const ZOOM_MIN = 0.4
 const ZOOM_MAX = 2
@@ -31,6 +34,21 @@ function createNoteAt(x: number, y: number): Note {
   }
 }
 
+/** Builds a new folder centered on the given canvas coordinates, prompting the user for its name. */
+function createFolderAt(x: number, y: number): FolderData | null {
+  const rawName = window.prompt('Nombre de la carpeta:', 'Carpeta')
+  if (rawName === null) return null
+  const name = rawName.trim() || 'Carpeta'
+  return {
+    id: crypto.randomUUID(),
+    x: x - FOLDER_SIZE / 2,
+    y: y - FOLDER_SIZE / 2,
+    width: FOLDER_SIZE,
+    height: FOLDER_SIZE,
+    name,
+  }
+}
+
 interface PanState {
   pointerId: number
   startX: number
@@ -40,18 +58,24 @@ interface PanState {
 }
 
 interface GhostState {
+  kind: 'note' | 'folder'
   clientX: number
   clientY: number
 }
 
-/** The main canvas: renders every note, and owns panning, zooming and the canvas boundary. */
+/** The main canvas: renders every note/folder, and owns panning, zooming and the canvas boundary. */
 export function Board() {
-  const [notes, setNotes] = useState<Note[]>(loadNotes)
-  // Snapshot of notes the canvas boundary is fitted to. It only updates when a
-  // note is added/removed or when a drag/resize gesture ends, not on every
+  const { folderName } = useParams<{ folderName?: string }>()
+  const scope = folderName ? decodeURIComponent(folderName) : ''
+  const navigate = useNavigate()
+
+  const [notes, setNotes] = useState<Note[]>(() => loadNotes(scope))
+  const [folders, setFolders] = useState<FolderData[]>(() => loadFolders(scope))
+  // Snapshot of items the canvas boundary is fitted to. It only updates when
+  // an item is added/removed or when a drag/resize gesture ends, not on every
   // frame of the gesture, so the canvas only grows/shrinks once you let go.
-  const [boundsNotes, setBoundsNotes] = useState<Note[]>(notes)
-  const initialViewport = useMemo(loadViewport, [])
+  const [boundsItems, setBoundsItems] = useState<(Note | FolderData)[]>(() => [...notes, ...folders])
+  const initialViewport = useMemo(() => loadViewport(scope), [scope])
   const [zoom, setZoom] = useState(initialViewport.zoom)
   const [pan, setPan] = useState(initialViewport.pan)
   const [isPanning, setIsPanning] = useState(false)
@@ -59,28 +83,32 @@ export function Board() {
   const boardRef = useRef<HTMLDivElement>(null)
   const panRef = useRef<PanState | null>(null)
 
-  const bounds = useMemo(() => computeBoundsForNotes(boundsNotes), [boundsNotes])
+  const bounds = useMemo(() => computeBounds(boundsItems), [boundsItems])
 
-  // Persist notes to localStorage whenever they change.
+  // Persist notes/folders to localStorage whenever they change.
   useEffect(() => {
-    saveNotes(notes)
-  }, [notes])
+    saveNotes(scope, notes)
+  }, [scope, notes])
 
-  // Adding/removing a note isn't a drag gesture, so reflect it immediately.
   useEffect(() => {
-    setBoundsNotes(notes)
+    saveFolders(scope, folders)
+  }, [scope, folders])
+
+  // Adding/removing an item isn't a drag gesture, so reflect it immediately.
+  useEffect(() => {
+    setBoundsItems([...notes, ...folders])
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notes.length])
+  }, [notes.length, folders.length])
 
-  /** Re-fits the canvas boundary to the notes' current positions/sizes. Called when a drag or resize ends. */
+  /** Re-fits the canvas boundary to the items' current positions/sizes. Called when a drag or resize ends. */
   function commitBounds() {
-    setBoundsNotes(notes)
+    setBoundsItems([...notes, ...folders])
   }
 
   // Persist the pan/zoom viewport to localStorage whenever it changes.
   useEffect(() => {
-    saveViewport({ pan, zoom })
-  }, [pan, zoom])
+    saveViewport(scope, { pan, zoom })
+  }, [scope, pan, zoom])
 
   /** Reads the board's current on-screen size, falling back to the window size before it's mounted. */
   function viewportSize() {
@@ -88,7 +116,7 @@ export function Board() {
     return board ? { width: board.clientWidth, height: board.clientHeight } : { width: window.innerWidth, height: window.innerHeight }
   }
 
-  // The boundary can shrink (e.g. a note dragged back toward the center), so
+  // The boundary can shrink (e.g. an item dragged back toward the center), so
   // re-clamp whenever it changes to make sure the current pan is still valid.
   useEffect(() => {
     const { width, height } = viewportSize()
@@ -141,8 +169,8 @@ export function Board() {
 
   /**
    * Starts panning the canvas: middle mouse button anywhere, or the primary
-   * button/touch when pressed directly on empty canvas (not a note or a
-   * control) — there's no middle mouse button on a phone, so this is how
+   * button/touch when pressed directly on empty canvas (not a note, folder or
+   * a control) — there's no middle mouse button on a phone, so this is how
    * panning works on touch.
    */
   function handleBoardPointerDown(e: PointerEvent<HTMLDivElement>) {
@@ -179,17 +207,33 @@ export function Board() {
     e.currentTarget.releasePointerCapture(e.pointerId)
   }
 
+  /** Converts a client-space point to canvas coordinates, or null if it's outside the board. */
+  function canvasPointFromClient(clientX: number, clientY: number) {
+    const board = boardRef.current
+    if (!board) return null
+    const rect = board.getBoundingClientRect()
+    const isOverCanvas = clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom
+    if (!isOverCanvas) return null
+    return { x: (clientX - rect.left - pan.x) / zoom, y: (clientY - rect.top - pan.y) / zoom }
+  }
+
   /** Starts dragging a new note out of the toolbar's note icon. */
   function handleNoteToolPointerDown(e: PointerEvent<HTMLButtonElement>) {
     if (e.button !== 0) return
     e.currentTarget.setPointerCapture(e.pointerId)
-    setGhost({ clientX: e.clientX, clientY: e.clientY })
+    setGhost({ kind: 'note', clientX: e.clientX, clientY: e.clientY })
   }
 
-  /** Follows the pointer with the ghost preview while dragging a new note out of the toolbar. */
-  function handleNoteToolPointerMove(e: PointerEvent<HTMLButtonElement>) {
-    if (!ghost) return
-    setGhost({ clientX: e.clientX, clientY: e.clientY })
+  /** Starts dragging a new folder out of the toolbar's folder icon. */
+  function handleFolderToolPointerDown(e: PointerEvent<HTMLButtonElement>) {
+    if (e.button !== 0) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setGhost({ kind: 'folder', clientX: e.clientX, clientY: e.clientY })
+  }
+
+  /** Follows the pointer with the ghost preview while dragging a new item out of the toolbar. */
+  function handleToolPointerMove(e: PointerEvent<HTMLButtonElement>) {
+    setGhost((prev) => (prev ? { ...prev, clientX: e.clientX, clientY: e.clientY } : prev))
   }
 
   /** Drops the new note onto the canvas if released over it, converting screen to canvas coordinates. */
@@ -197,17 +241,20 @@ export function Board() {
     if (!ghost) return
     e.currentTarget.releasePointerCapture(e.pointerId)
     setGhost(null)
+    const point = canvasPointFromClient(e.clientX, e.clientY)
+    if (!point) return
+    setNotes((prev) => [...prev, createNoteAt(point.x, point.y)])
+  }
 
-    const board = boardRef.current
-    if (!board) return
-    const rect = board.getBoundingClientRect()
-    const isOverCanvas =
-      e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom
-    if (!isOverCanvas) return
-
-    const canvasX = (e.clientX - rect.left - pan.x) / zoom
-    const canvasY = (e.clientY - rect.top - pan.y) / zoom
-    setNotes((prev) => [...prev, createNoteAt(canvasX, canvasY)])
+  /** Drops the new folder onto the canvas if released over it, prompting for its name. */
+  function handleFolderToolPointerUp(e: PointerEvent<HTMLButtonElement>) {
+    if (!ghost) return
+    e.currentTarget.releasePointerCapture(e.pointerId)
+    setGhost(null)
+    const point = canvasPointFromClient(e.clientX, e.clientY)
+    if (!point) return
+    const folder = createFolderAt(point.x, point.y)
+    if (folder) setFolders((prev) => [...prev, folder])
   }
 
   /** Updates a note's position (called continuously while it's being dragged). */
@@ -228,6 +275,21 @@ export function Board() {
   /** Deletes a note from the board. */
   function removeNote(id: string) {
     setNotes((prev) => prev.filter((note) => note.id !== id))
+  }
+
+  /** Updates a folder's position (called continuously while it's being dragged). */
+  function moveFolder(id: string, x: number, y: number) {
+    setFolders((prev) => prev.map((folder) => (folder.id === id ? { ...folder, x, y } : folder)))
+  }
+
+  /** Deletes a folder (and, implicitly, leaves its own canvas data orphaned in localStorage under its name). */
+  function removeFolder(id: string) {
+    setFolders((prev) => prev.filter((folder) => folder.id !== id))
+  }
+
+  /** Navigates into a folder's own independent canvas. */
+  function openFolder(name: string) {
+    navigate(`/${encodeURIComponent(name)}`)
   }
 
   /** Pans horizontally so the given 0-1 ratio along the canvas width becomes the view's center. */
@@ -251,8 +313,13 @@ export function Board() {
     <div className="flex h-screen flex-col">
       <Toolbar
         onNoteToolPointerDown={handleNoteToolPointerDown}
-        onNoteToolPointerMove={handleNoteToolPointerMove}
+        onNoteToolPointerMove={handleToolPointerMove}
         onNoteToolPointerUp={handleNoteToolPointerUp}
+        onFolderToolPointerDown={handleFolderToolPointerDown}
+        onFolderToolPointerMove={handleToolPointerMove}
+        onFolderToolPointerUp={handleFolderToolPointerUp}
+        currentFolderName={scope || undefined}
+        onBack={() => navigate('/')}
       />
 
       <div
@@ -310,15 +377,33 @@ export function Board() {
               onRemove={removeNote}
             />
           ))}
+          {folders.map((folder) => (
+            <Folder
+              key={folder.id}
+              folder={folder}
+              zoom={zoom}
+              onMove={moveFolder}
+              onDragEnd={commitBounds}
+              onOpen={openFolder}
+              onRemove={removeFolder}
+            />
+          ))}
         </div>
 
         <Scrollbar orientation="horizontal" start={scrollMetrics.startX} size={scrollMetrics.sizeX} onScrollTo={scrollToX} />
         <Scrollbar orientation="vertical" start={scrollMetrics.startY} size={scrollMetrics.sizeY} onScrollTo={scrollToY} />
       </div>
 
-      {ghost && (
+      {ghost && ghost.kind === 'note' && (
         <div
           className="create-ghost fixed z-30 -mt-7.5 -ml-7.5 h-15 w-15 rounded border border-[#c9b94a] bg-[#fff59d] opacity-85 shadow-[3px_4px_10px_rgba(0,0,0,0.25)] pointer-events-none"
+          style={{ left: ghost.clientX, top: ghost.clientY }}
+          aria-hidden="true"
+        />
+      )}
+      {ghost && ghost.kind === 'folder' && (
+        <div
+          className="create-ghost fixed z-30 -mt-7.5 -ml-7.5 h-15 w-15 rounded-lg border border-blue-400 bg-blue-100 opacity-85 shadow-[3px_4px_10px_rgba(0,0,0,0.25)] pointer-events-none"
           style={{ left: ghost.clientX, top: ghost.clientY }}
           aria-hidden="true"
         />
