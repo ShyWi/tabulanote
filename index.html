@@ -9,6 +9,15 @@
     />
     <title>TabulaNote</title>
     <script type="text/javascript">
+      // Applies the saved theme before the first paint, so there's no flash
+      // of the wrong theme while React boots up.
+      ;(function () {
+        var saved = localStorage.getItem('tabulanote.theme')
+        var dark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        if (dark) document.documentElement.classList.add('dark')
+      })()
+    </script>
+    <script type="text/javascript">
       // Un-does the redirect from 404.html, restoring the original path
       // (e.g. /tabulanote/MiCarpeta) before react-router reads the URL.
       ;(function (l) {
@@ -24,8 +33,8 @@
         }
       })(window.location)
     </script>
-    <script type="module" crossorigin src="/tabulanote/assets/index-VU-I7A6h.js"></script>
-    <link rel="stylesheet" crossorigin href="/tabulanote/assets/index-BXEWCFpE.css">
+    <script type="module" crossorigin src="/tabulanote/assets/index-BmCowTI3.js"></script>
+    <link rel="stylesheet" crossorigin href="/tabulanote/assets/index-DIRQphrp.css">
   </head>
   <body>
     <div id="root"></div>
