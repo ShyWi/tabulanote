@@ -39,9 +39,19 @@ export function PostIt({ note, zoom, onMove, onMoveEnd, onResize, onResizeEnd, o
   const dragRef = useRef<DragState | null>(null)
   const resizeRef = useRef<ResizeState | null>(null)
 
-  /** Starts tracking a potential move drag from anywhere on the note (left mouse button only). */
+  /**
+   * Starts tracking a potential move drag from anywhere on the note (left
+   * mouse button only). On touch, a press starting directly on the textarea
+   * is left alone instead: the OS's native text-cursor/selection gesture for
+   * editable fields competes with our synthetic drag tracking and usually
+   * wins, making drags that start over the text unreliable. Mouse/pen aren't
+   * affected by that OS gesture, so they can still drag from anywhere,
+   * including over the text — touch dragging works from the handle, the
+   * borders, or the background instead.
+   */
   function handlePointerDown(e: PointerEvent<HTMLDivElement>) {
     if (e.button !== 0) return
+    if (e.pointerType === 'touch' && (e.target as HTMLElement).tagName === 'TEXTAREA') return
     dragRef.current = {
       pointerId: e.pointerId,
       startX: e.clientX,
