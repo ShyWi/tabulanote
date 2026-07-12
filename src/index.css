@@ -1,8 +1,24 @@
 @import "tailwindcss";
 
+/* Switches `dark:` from OS-preference-based to manual: active whenever the
+   <html> element (or an ancestor) has the `dark` class, toggled by useTheme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 html,
 body,
 #root {
   height: 100%;
   margin: 0;
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background: #fff;
+}
+
+html.dark body {
+  background: #171717;
 }

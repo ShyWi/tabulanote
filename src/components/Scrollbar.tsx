@@ -40,8 +40,8 @@ export function Scrollbar({ orientation, start, size, onScrollTo }: Props) {
       ref={trackRef}
       className={`scrollbar scrollbar--${orientation} ${
         isHorizontal
-          ? 'absolute right-3.5 bottom-0 left-0 z-10 h-3.5 touch-none bg-black/5'
-          : 'absolute top-0 right-0 bottom-3.5 z-10 w-3.5 touch-none bg-black/5'
+          ? 'absolute right-3.5 bottom-0 left-0 z-10 h-3.5 touch-none bg-black/5 dark:bg-white/5'
+          : 'absolute top-0 right-0 bottom-3.5 z-10 w-3.5 touch-none bg-black/5 dark:bg-white/5'
       }`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -49,8 +49,8 @@ export function Scrollbar({ orientation, start, size, onScrollTo }: Props) {
       <div
         className={`scrollbar__thumb ${
           isHorizontal
-            ? 'absolute top-0.5 bottom-0.5 rounded-full bg-black/25 hover:bg-black/40'
-            : 'absolute right-0.5 left-0.5 rounded-full bg-black/25 hover:bg-black/40'
+            ? 'absolute top-0.5 bottom-0.5 rounded-full bg-black/25 hover:bg-black/40 dark:bg-white/25 dark:hover:bg-white/40'
+            : 'absolute right-0.5 left-0.5 rounded-full bg-black/25 hover:bg-black/40 dark:bg-white/25 dark:hover:bg-white/40'
         }`}
         style={
           isHorizontal

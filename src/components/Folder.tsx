@@ -86,7 +86,9 @@ export function Folder({ folder, zoom, isDropTarget, onMove, onDragEnd, onOpen, 
   return (
     <div
       className={`folder absolute flex touch-none cursor-pointer flex-col items-center rounded-lg border p-2 shadow-[3px_4px_10px_rgba(0,0,0,0.2)] select-none ${
-        isDropTarget ? 'border-blue-500 bg-blue-200 ring-4 ring-blue-300' : 'border-blue-200 bg-blue-50'
+        isDropTarget
+          ? 'border-blue-500 bg-blue-200 ring-4 ring-blue-300 dark:border-blue-400 dark:bg-blue-900 dark:ring-blue-700'
+          : 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-neutral-800'
       }`}
       style={{ left: folder.x, top: folder.y, width: folder.width, height: folder.height }}
       onPointerDown={handlePointerDown}
@@ -95,7 +97,7 @@ export function Folder({ folder, zoom, isDropTarget, onMove, onDragEnd, onOpen, 
     >
       <button
         type="button"
-        className="folder__close absolute top-0 right-0 cursor-pointer border-0 bg-transparent px-2.5 py-1 text-base leading-none text-black/40 hover:text-black/70"
+        className="folder__close absolute top-0 right-0 cursor-pointer border-0 bg-transparent px-2.5 py-1 text-base leading-none text-black/40 hover:text-black/70 dark:text-white/50 dark:hover:text-white/85"
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation()
@@ -115,7 +117,7 @@ export function Folder({ folder, zoom, isDropTarget, onMove, onDragEnd, onOpen, 
           strokeWidth="1"
         />
       </svg>
-      <span className="folder__name mt-1 max-w-full truncate px-1 text-sm font-medium text-neutral-700">
+      <span className="folder__name mt-1 max-w-full truncate px-1 text-sm font-medium text-neutral-700 dark:text-neutral-200">
         {folder.name}
       </span>
     </div>

@@ -7,6 +7,7 @@ import { PostIt } from './PostIt'
 import { Folder } from './Folder'
 import { Scrollbar } from './Scrollbar'
 import { Toolbar } from './Toolbar'
+import type { Theme } from '../useTheme'
 
 const COLORS = ['#fff59d', '#ffccbc', '#c8e6c9', '#bbdefb', '#e1bee7']
 const NOTE_SIZE = 180
@@ -75,8 +76,13 @@ interface GhostState {
   clientY: number
 }
 
+interface Props {
+  theme: Theme
+  onToggleTheme: () => void
+}
+
 /** The main canvas: renders every note/folder, and owns panning, zooming and the canvas boundary. */
-export function Board() {
+export function Board({ theme, onToggleTheme }: Props) {
   const { folderName } = useParams<{ folderName?: string }>()
   const scope = folderName ? decodeURIComponent(folderName) : ''
   const navigate = useNavigate()
@@ -461,10 +467,12 @@ export function Board() {
         foldersDisabled={scope !== ''}
         currentFolderName={scope || undefined}
         onBack={() => navigate('/')}
+        theme={theme}
+        onToggleTheme={onToggleTheme}
       />
 
       <div
-        className={`board relative min-h-0 flex-1 touch-none overflow-hidden bg-neutral-100 bg-[radial-gradient(#d7dbe0_1px,transparent_1px)] [background-size:24px_24px] ${
+        className={`board relative min-h-0 flex-1 touch-none overflow-hidden bg-neutral-100 bg-[radial-gradient(#d7dbe0_1px,transparent_1px)] [background-size:24px_24px] dark:bg-neutral-900 dark:bg-[radial-gradient(#333_1px,transparent_1px)] ${
           isPanning ? 'cursor-grabbing select-none' : ''
         }`}
         ref={boardRef}
@@ -473,21 +481,21 @@ export function Board() {
         onPointerUp={handleBoardPointerUp}
         onPointerCancel={handleBoardPointerUp}
       >
-        <div className="board__zoom absolute right-3 bottom-3 z-20 flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1.5 shadow-md sm:right-4 sm:bottom-4">
+        <div className="board__zoom absolute right-3 bottom-3 z-20 flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1.5 shadow-md sm:right-4 sm:bottom-4 dark:bg-neutral-800">
           <button
             type="button"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-100 text-lg leading-none text-neutral-800 hover:bg-neutral-200"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-100 text-lg leading-none text-neutral-800 hover:bg-neutral-200 dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600"
             onClick={() => setZoomClamped(zoom - ZOOM_STEP)}
             aria-label="Alejar"
           >
             −
           </button>
-          <span className="min-w-[3ch] text-center text-sm font-semibold text-neutral-600">
+          <span className="min-w-[3ch] text-center text-sm font-semibold text-neutral-600 dark:text-neutral-300">
             {Math.round(zoom * 100)}%
           </span>
           <button
             type="button"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-100 text-lg leading-none text-neutral-800 hover:bg-neutral-200"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-100 text-lg leading-none text-neutral-800 hover:bg-neutral-200 dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600"
             onClick={() => setZoomClamped(zoom + ZOOM_STEP)}
             aria-label="Acercar"
           >
@@ -495,7 +503,7 @@ export function Board() {
           </button>
           <button
             type="button"
-            className="h-8 rounded-full bg-neutral-100 px-2.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-200"
+            className="h-8 rounded-full bg-neutral-100 px-2.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-200 dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600"
             onClick={() => setZoomClamped(1)}
           >
             Reset

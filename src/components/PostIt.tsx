@@ -138,7 +138,8 @@ export function PostIt({ note, zoom, onMove, onMoveEnd, onResize, onResizeEnd, o
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
     >
-      <div className="postit__handle flex h-7 shrink-0 cursor-grab justify-end active:cursor-grabbing">
+      {/* Divider marks this strip as the drag handle, separate from the text below. */}
+      <div className="postit__handle flex h-7 shrink-0 cursor-grab justify-end border-b border-black/15 active:cursor-grabbing">
         <button
           type="button"
           className="postit__close cursor-pointer border-0 bg-transparent px-2.5 py-1 text-base leading-none text-black/50 hover:text-black/80"
